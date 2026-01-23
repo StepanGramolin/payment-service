@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using PaymentService.DataAccess.Postgres.AppDbContext;
 using PaymentService.WebApi.Infrastructure;
+using PaymentService.WebApi.Mappers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,9 @@ builder.Services.AddDbContext<PaymentsDbContext>(opt =>
 
 // Kafka producer (publishes JSON events)
 builder.Services.AddSingleton<KafkaProducer>();
+
+// Регистрации Mapperly
+builder.Services.AddSingleton<PaymentMapper>();
 
 var app = builder.Build();
 

@@ -1,9 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using PaymentService.WebApi.Models;
-using System.Collections.Generic;
-using System.Reflection.Emit;
+using PaymentService.DataAccess.Postgres.Models;
 
-namespace PaymentService.WebApi.Infrastructure;
+namespace PaymentService.DataAccess.Postgres.AppDbContext;
 
 public sealed class PaymentsDbContext : DbContext
 {

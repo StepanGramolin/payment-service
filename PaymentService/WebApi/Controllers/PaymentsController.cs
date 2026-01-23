@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PaymentService.DataAccess.Postgres.AppDbContext;
 using PaymentService.WebApi.Contracts;
 using PaymentService.WebApi.Infrastructure;
-using PaymentService.WebApi.Models;
+using PaymentService.DataAccess.Postgres.Models;
+using PaymentService.WebApi.Mappers;
 
 namespace PaymentService.WebApi.Controllers;
 
@@ -12,11 +14,13 @@ public sealed class PaymentsController : ControllerBase
 {
     private readonly PaymentsDbContext _db;
     private readonly KafkaProducer _producer;
+    private readonly PaymentMapper _paymentMapper;
 
-    public PaymentsController(PaymentsDbContext db, KafkaProducer producer)
+    public PaymentsController(PaymentsDbContext db, KafkaProducer producer, PaymentMapper paymentMapper)
     {
         _db = db;
         _producer = producer;
+        _paymentMapper = paymentMapper;
     }
 
     [HttpPut("updateStatus/{paymentId:long}/{statusId:int}")]
@@ -40,12 +44,7 @@ public sealed class PaymentsController : ControllerBase
                     ? cid.ToString()
                     : Guid.NewGuid().ToString("N");
 
-            var evt = new PaymentSucceededV1(
-                PaymentId: payment.OrderId,             // paymentId == orderId
-                OrderId: payment.OrderId,
-                Price: payment.Price,
-                OccurredAtUtc: DateTimeOffset.UtcNow
-            );
+            var evt = _paymentMapper.ToPaymentSucceededV1(payment);
 
             await _producer.ProducePaymentSucceededAsync(evt, correlationId, ct);
         }
@@ -53,9 +52,9 @@ public sealed class PaymentsController : ControllerBase
         return NoContent();
     }
 
-        // POST api/payments/create
-        // body: { orderId: long, price: decimal }
-        [HttpPost("create")]
+    // POST api/payments/create
+    // body: { orderId: long, price: decimal }
+    [HttpPost("create")]
     public async Task<IActionResult> Create([FromBody] CreatePaymentRequest request, CancellationToken ct)
     {
         // Если платеж уже есть — просто вернуть OK
@@ -63,13 +62,7 @@ public sealed class PaymentsController : ControllerBase
         if (existing is not null)
             return Ok(new { paymentId = existing.OrderId });
 
-        var payment = new Payment
-        {
-            OrderId = request.OrderId,
-            Price = request.Price,
-            Status = false,
-            DateCreate = DateTime.UtcNow
-        };
+        var payment = _paymentMapper.ToPaymentEntity(request);
 
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync(ct);
@@ -85,13 +78,16 @@ public sealed class PaymentsController : ControllerBase
         var payment = await _db.Payments.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == paymentId, ct);
         if (payment is null) return NotFound();
 
-        return Ok(new
-        {
-            price = payment.Price,
-            status = payment.Status,
-            dateCreate = payment.DateCreate
-        });
+        return Ok(_paymentMapper.ToGetPaymentResponse(payment));
     }
 }
 
-public sealed record CreatePaymentRequest(long OrderId, decimal Price);
+public sealed record CreatePaymentRequest(
+    long OrderId, 
+    decimal Price);
+
+public sealed record GetPaymentResponse(
+    decimal Price,
+    bool Status,
+    DateTimeOffset DateCreate
+);

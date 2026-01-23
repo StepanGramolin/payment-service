@@ -1,4 +1,4 @@
-﻿namespace PaymentService.WebApi.Models;
+﻿namespace PaymentService.DataAccess.Postgres.Models;
 
 public sealed class Payment
 {
@@ -7,8 +7,7 @@ public sealed class Payment
 
     public decimal Price { get; set; }
 
-    // В таблице/ответе нужен bool
     public bool Status { get; set; }
 
-    public DateTime DateCreate { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset DateCreate { get; set; } = DateTime.UtcNow;
 }

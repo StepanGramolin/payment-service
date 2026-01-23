@@ -4,11 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using PaymentService.WebApi.Infrastructure;
+using PaymentService.DataAccess.Postgres.AppDbContext;
+
 
 #nullable disable
 
-namespace PaymentService.WebApi.Migrations
+namespace PaymentService.DataAccess.Postgres.Migrations
 {
     [DbContext(typeof(PaymentsDbContext))]
     partial class PaymentsDbContextModelSnapshot : ModelSnapshot
@@ -22,7 +23,7 @@ namespace PaymentService.WebApi.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("PaymentService.WebApi.Models.Payment", b =>
+            modelBuilder.Entity("PaymentService.DataAccess.Postgres.Models.Payment", b =>
                 {
                     b.Property<long>("OrderId")
                         .HasColumnType("bigint");

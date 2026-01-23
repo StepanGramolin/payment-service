@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace PaymentService.WebApi.Infrastructure;
+namespace PaymentService.DataAccess.Postgres.AppDbContext;
 
 public sealed class PaymentsDbContextFactory : IDesignTimeDbContextFactory<PaymentsDbContext>
 {
