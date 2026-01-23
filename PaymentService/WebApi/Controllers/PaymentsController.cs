@@ -24,12 +24,14 @@ public sealed class PaymentsController : ControllerBase
     }
 
     [HttpPut("updateStatus/{paymentId:long}/{statusId:int}")]
-    public async Task<IActionResult> UpdateStatus(long paymentId, int statusId, CancellationToken ct)
+    public async Task<IActionResult> UpdateStatus(
+        [FromRoute] UpdateStatusRequest request,
+        CancellationToken ct)
     {
-        var payment = await _db.Payments.FirstOrDefaultAsync(x => x.OrderId == paymentId, ct);
+        var payment = await _db.Payments.FirstOrDefaultAsync(x => x.OrderId == request.PaymentId, ct);
         if (payment is null) return NotFound();
 
-        var newStatus = statusId == 1;
+        var newStatus = request.StatusId == 1;
 
         // если уже был true и снова true Ч событие не шлЄм
         var wasSucceeded = payment.Status;
@@ -81,6 +83,12 @@ public sealed class PaymentsController : ControllerBase
         return Ok(_paymentMapper.ToGetPaymentResponse(payment));
     }
 }
+
+public sealed record UpdateStatusRequest(
+    long PaymentId,
+    int StatusId
+    );
+
 
 public sealed record CreatePaymentRequest(
     long OrderId, 
