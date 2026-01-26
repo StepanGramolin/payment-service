@@ -1,19 +1,17 @@
 ﻿using FluentValidation;
-using PaymentService.WebApi.Controllers;
+using PaymentService.WebApi.UseCases.Commands;
 
 namespace PaymentService.WebApi.Validators;
 
-public class CreatePaymentRequestValidator : AbstractValidator<CreatePaymentRequest>
+public class CreatePaymentCommandValidator : AbstractValidator<CreatePaymentCommand>
 {
-    public CreatePaymentRequestValidator()
+    public CreatePaymentCommandValidator()
     {
-        // Валидация OrderId
-        RuleFor(request => request.OrderId)
+        RuleFor(x => x.OrderId)
             .NotEmpty().WithMessage("Order ID is required.")
             .GreaterThan(0).WithMessage("Order ID must be a positive number.");
 
-        // Валидация Price
-        RuleFor(request => request.Price)
+        RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("Price must be greater than zero.");
     }
 }

@@ -1,19 +1,22 @@
 ﻿using FluentValidation;
-using PaymentService.WebApi.Controllers;
-
+using PaymentService.WebApi.UseCases;
 
 namespace PaymentService.WebApi.Validators;
 
-public class UpdateStatusRequestValidator : AbstractValidator<UpdateStatusRequest>
+public class UpdatePaymentStatusCommandValidator : AbstractValidator<UpdatePaymentStatusCommand>
 {
-    public UpdateStatusRequestValidator()
+    public UpdatePaymentStatusCommandValidator()
     {
         RuleFor(x => x.PaymentId)
             .GreaterThan(0)
-            .WithMessage("ID платежа должен быть положительным числом");
+            .WithMessage("Payment ID must be a positive number.");
 
         RuleFor(x => x.StatusId)
             .InclusiveBetween(0, 2)
-            .WithMessage("Статус платежа должен быть в диапазоне от 0 до 2");
+            .WithMessage("Payment status must be between 0 and 2.");
+
+        // Валидация CorrelationId, так как он теперь часть команды
+        RuleFor(x => x.CorrelationId)
+            .NotEmpty().WithMessage("Correlation ID is required.");
     }
 }

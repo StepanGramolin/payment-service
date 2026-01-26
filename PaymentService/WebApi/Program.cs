@@ -1,12 +1,8 @@
 using FluentValidation;
-using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using PaymentService.DataAccess.Postgres.AppDbContext;
-using PaymentService.WebApi.Controllers;
 using PaymentService.WebApi.Infrastructure;
 using PaymentService.WebApi.Mappers;
-using PaymentService.WebApi.Validators;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,10 +21,18 @@ builder.Services.AddDbContext<PaymentsDbContext>(opt =>
 builder.Services.AddSingleton<KafkaProducer>();
 
 // FluentValidation
-builder.Services.AddValidatorsFromAssemblyContaining<UpdateStatusRequestValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<CreatePaymentRequestValidator>();
-builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
+// Регистрация MediatR
+builder.Services.AddMediatR(cfg => {
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<GlobalExceptionFilter>();
+});
 
 // Регистрации Mapperly
 builder.Services.AddSingleton<PaymentMapper>();
