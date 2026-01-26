@@ -1,10 +1,7 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using PaymentService.DataAccess.Postgres.AppDbContext;
-using PaymentService.WebApi.Contracts;
-using PaymentService.WebApi.Infrastructure;
-using PaymentService.DataAccess.Postgres.Models;
-using PaymentService.WebApi.Mappers;
+using PaymentService.WebApi.UseCases;
+using PaymentService.WebApi.UseCases.Commands;
 
 namespace PaymentService.WebApi.Controllers;
 
@@ -12,75 +9,36 @@ namespace PaymentService.WebApi.Controllers;
 [Route("api/payments")]
 public sealed class PaymentsController : ControllerBase
 {
-    private readonly PaymentsDbContext _db;
-    private readonly KafkaProducer _producer;
-    private readonly PaymentMapper _paymentMapper;
+    private readonly IMediator _mediator;
 
-    public PaymentsController(PaymentsDbContext db, KafkaProducer producer, PaymentMapper paymentMapper)
-    {
-        _db = db;
-        _producer = producer;
-        _paymentMapper = paymentMapper;
-    }
+    public PaymentsController(IMediator mediator) => _mediator = mediator;
 
     [HttpPut("updateStatus/{paymentId:long}/{statusId:int}")]
-    public async Task<IActionResult> UpdateStatus(
-        [FromRoute] UpdateStatusRequest request,
-        CancellationToken ct)
+    public async Task<IActionResult> UpdateStatus(long paymentId, int statusId, CancellationToken ct)
     {
-        var payment = await _db.Payments.FirstOrDefaultAsync(x => x.OrderId == request.PaymentId, ct);
-        if (payment is null) return NotFound();
+        // »звлекаем коррел€цию пр€мо здесь
+        var correlationId = Request.Headers.TryGetValue("X-Correlation-Id", out var cid)
+            ? cid.ToString()
+            : Guid.NewGuid().ToString("N");
 
-        var newStatus = request.StatusId == 1;
+        var command = new UpdatePaymentStatusCommand(paymentId, statusId, correlationId);
+        var result = await _mediator.Send(command, ct);
 
-        // если уже был true и снова true Ч событие не шлЄм
-        var wasSucceeded = payment.Status;
-        payment.Status = newStatus;
-
-        await _db.SaveChangesAsync(ct);
-
-        if (newStatus && !wasSucceeded)
-        {
-            var correlationId =
-                Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
-                    ? cid.ToString()
-                    : Guid.NewGuid().ToString("N");
-
-            var evt = _paymentMapper.ToPaymentSucceededV1(payment);
-
-            await _producer.ProducePaymentSucceededAsync(evt, correlationId, ct);
-        }
-
-        return NoContent();
+        return result ? NoContent() : NotFound();
     }
 
-    // POST api/payments/create
-    // body: { orderId: long, price: decimal }
     [HttpPost("create")]
-    public async Task<IActionResult> Create([FromBody] CreatePaymentRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreatePaymentCommand command, CancellationToken ct)
     {
-        // ≈сли платеж уже есть Ч просто вернуть OK
-        var existing = await _db.Payments.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == request.OrderId, ct);
-        if (existing is not null)
-            return Ok(new { paymentId = existing.OrderId });
-
-        var payment = _paymentMapper.ToPaymentEntity(request);
-
-        _db.Payments.Add(payment);
-        await _db.SaveChangesAsync(ct);
-
-        // paymentId == orderId
-        return Ok(new { paymentId = payment.OrderId });
+        var paymentId = await _mediator.Send(command, ct);
+        return Ok(new { paymentId });
     }
 
-    // GET api/payments/get/{paymentId}
     [HttpGet("get/{paymentId:long}")]
     public async Task<IActionResult> Get(long paymentId, CancellationToken ct)
     {
-        var payment = await _db.Payments.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == paymentId, ct);
-        if (payment is null) return NotFound();
-
-        return Ok(_paymentMapper.ToGetPaymentResponse(payment));
+        var result = await _mediator.Send(new GetPaymentQuery(paymentId), ct);
+        return result is null ? NotFound() : Ok(result);
     }
 }
 
