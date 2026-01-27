@@ -1,111 +1,66 @@
 ﻿using FluentAssertions;
-using MediatR;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Moq;
+using Microsoft.EntityFrameworkCore;
 using NUnit.Framework;
-using PaymentService.WebApi.Controllers;
+using PaymentService.DataAccess.Postgres.AppDbContext;
+using PaymentService.DataAccess.Postgres.Models;
+using PaymentService.WebApi.Mappers;
+using PaymentService.WebApi.UseCases;
 using PaymentService.WebApi.UseCases.Commands;
 
-namespace PaymentService.Tests.Tests;
+namespace PaymentService.UnitTests.Tests;
 
 [TestFixture]
-public class PaymentsControllerTests
+public class CreatePaymentHandlerTests
 {
-    private Mock<IMediator> _mediatorMock;
-    private PaymentsController _controller;
+    private PaymentsDbContext _db;
+    private PaymentMapper _mapper;
+    private CreatePaymentHandler _handler;
 
     [SetUp]
     public void Setup()
     {
-        _mediatorMock = new Mock<IMediator>();
-        _controller = new PaymentsController(_mediatorMock.Object);
+        var options = new DbContextOptionsBuilder<PaymentsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+        _db = new PaymentsDbContext(options);
+        _mapper = new PaymentMapper();
+        _handler = new CreatePaymentHandler(_db, _mapper);
+    }
 
-        // Мокаем HttpContext для доступа к Request.Headers (для CorrelationId)
-        var httpContext = new DefaultHttpContext();
-        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+    [TearDown]
+    public void TearDown() => _db.Dispose();
+
+    [Test]
+    public async Task Handle_NewPayment_ShouldCreatePaymentAndReturnOrderId()
+    {
+        var command = new CreatePaymentCommand(OrderId: 10, Price: 250);
+
+        var resultOrderId = await _handler.Handle(command, CancellationToken.None);
+
+        resultOrderId.Should().Be(command.OrderId);
+        var payment = await _db.Payments.FindAsync(command.OrderId);
+        payment.Should().NotBeNull();
+        payment!.Price.Should().Be(command.Price);
+        payment.Status.Should().BeFalse(); // По умолчанию при создании статус false
     }
 
     [Test]
-    public async Task Create_ValidCommand_ShouldReturnOkWithPaymentId()
+    public async Task Handle_ExistingPayment_ShouldReturnExistingOrderIdWithoutCreatingNew()
     {
         // Arrange
-        var command = new CreatePaymentCommand(1L, 100);
-        _mediatorMock.Setup(m => m.Send(It.IsAny<CreatePaymentCommand>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync(1L);
+        _db.Payments.Add(new Payment { OrderId = 10, Price = 200, Status = true });
+        await _db.SaveChangesAsync();
+
+        var command = new CreatePaymentCommand(OrderId: 10, Price: 250); // Повторная попытка создания
 
         // Act
-        var result = await _controller.Create(command, CancellationToken.None);
+        var resultOrderId = await _handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(new { paymentId = 1L });
-        _mediatorMock.Verify(m => m.Send(command, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Test]
-    public async Task UpdateStatus_ValidCommand_ShouldReturnNoContent()
-    {
-        // Arrange
-        var command = new CreatePaymentCommand(1L, 100);
-        _mediatorMock.Setup(m => m.Send(It.IsAny<CreatePaymentCommand>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync(1L);
-
-        // Act
-        var result = await _controller.Create(command, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(new { paymentId = 1L });
-        _mediatorMock.Verify(m => m.Send(command, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Test]
-    public async Task UpdateStatus_NotFoundPayment_ShouldReturnNotFound()
-    {
-        // Arrange
-        _mediatorMock.Setup(m => m.Send(It.IsAny<UpdatePaymentStatusCommand>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync(false);
-
-        // Act
-        var result = await _controller.UpdateStatus(999, 1, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<NotFoundResult>();
-        _mediatorMock.Verify(m => m.Send(It.IsAny<UpdatePaymentStatusCommand>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Test]
-    public async Task Get_ExistingPayment_ShouldReturnOkWithPaymentResponse()
-    {
-        // Arrange
-        var paymentResponse = new GetPaymentResponse(100, true, DateTimeOffset.UtcNow);
-        _mediatorMock.Setup(m => m.Send(It.IsAny<GetPaymentQuery>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync(paymentResponse);
-
-        // Act
-        var result = await _controller.Get(1, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        (result as OkObjectResult)!.Value.Should().Be(paymentResponse);
-        _mediatorMock.Verify(m => m.Send(It.Is<GetPaymentQuery>(q => q.PaymentId == 1), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Test]
-    public async Task Get_NonExistingPayment_ShouldReturnNotFound()
-    {
-        // Arrange
-        _mediatorMock.Setup(m => m.Send(It.IsAny<GetPaymentQuery>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync((GetPaymentResponse?)null);
-
-        // Act
-        var result = await _controller.Get(999, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<NotFoundResult>();
-        _mediatorMock.Verify(m => m.Send(It.IsAny<GetPaymentQuery>(), It.IsAny<CancellationToken>()), Times.Once);
+        resultOrderId.Should().Be(command.OrderId);
+        // Проверяем, что никаких новых платежей не создалось и старый не изменился
+        var paymentCount = await _db.Payments.CountAsync();
+        paymentCount.Should().Be(1);
+        var existingPayment = await _db.Payments.FindAsync(command.OrderId);
+        existingPayment!.Price.Should().Be(200); // Цена не должна измениться
     }
 }
