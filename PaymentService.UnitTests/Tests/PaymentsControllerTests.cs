@@ -22,7 +22,6 @@ public class PaymentsControllerTests
         _mediatorMock = new Mock<IMediator>();
         _controller = new PaymentsController(_mediatorMock.Object);
 
-        // Мокаем HttpContext для доступа к Request.Headers (для CorrelationId)
         var httpContext = new DefaultHttpContext();
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
