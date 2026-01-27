@@ -17,10 +17,10 @@ builder.Services.AddDbContext<PaymentsDbContext>(opt =>
     opt.UseNpgsql(cs);
 });
 
-// Kafka producer (publishes JSON events)
-builder.Services.AddSingleton<KafkaProducer>();
+// Регистрация Kafka
+builder.Services.AddScoped<IKafkaProducer, KafkaProducer>();
 
-// FluentValidation
+// Регистрация FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
 // Регистрация MediatR
@@ -44,8 +44,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
-// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

@@ -1,5 +1,5 @@
 ﻿using FluentValidation;
-using PaymentService.WebApi.UseCases;
+using PaymentService.WebApi.UseCases.Commands;
 
 namespace PaymentService.WebApi.Validators;
 
@@ -12,8 +12,8 @@ public class UpdatePaymentStatusCommandValidator : AbstractValidator<UpdatePayme
             .WithMessage("Payment ID must be a positive number.");
 
         RuleFor(x => x.StatusId)
-            .InclusiveBetween(0, 2)
-            .WithMessage("Payment status must be between 0 and 2.");
+            .InclusiveBetween(0, 1)
+            .WithMessage("Payment status must be 0 or 1.");
 
         // Валидация CorrelationId, так как он теперь часть команды
         RuleFor(x => x.CorrelationId)

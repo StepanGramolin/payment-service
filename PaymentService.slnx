@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="PaymentService/PaymentService.csproj" />
+  <Project Path="PaymentService.UnitTests/PaymentService.UnitTests.csproj" />
 </Solution>

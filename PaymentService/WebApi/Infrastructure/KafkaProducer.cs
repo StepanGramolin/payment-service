@@ -5,7 +5,7 @@ using PaymentService.WebApi.Contracts;
 
 namespace PaymentService.WebApi.Infrastructure;
 
-public sealed class KafkaProducer : IDisposable
+public sealed class KafkaProducer : IDisposable, IKafkaProducer
 {
     private readonly IProducer<string, string> _producer;
     private readonly string _topic;
@@ -55,4 +55,9 @@ public sealed class KafkaProducer : IDisposable
     }
 
     public void Dispose() => _producer.Dispose();
+}
+
+public interface IKafkaProducer
+{
+    Task ProducePaymentSucceededAsync(PaymentSucceededV1 evt, string correlationId, CancellationToken ct);
 }

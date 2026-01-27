@@ -1,6 +1,5 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using PaymentService.WebApi.UseCases;
 using PaymentService.WebApi.UseCases.Commands;
 
 namespace PaymentService.WebApi.Controllers;
@@ -16,7 +15,7 @@ public sealed class PaymentsController : ControllerBase
     [HttpPut("updateStatus/{paymentId:long}/{statusId:int}")]
     public async Task<IActionResult> UpdateStatus(long paymentId, int statusId, CancellationToken ct)
     {
-        // »звлекаем коррел€цию пр€мо здесь
+        // »звлекаем коррел€цию здесь
         var correlationId = Request.Headers.TryGetValue("X-Correlation-Id", out var cid)
             ? cid.ToString()
             : Guid.NewGuid().ToString("N");
@@ -41,12 +40,6 @@ public sealed class PaymentsController : ControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 }
-
-public sealed record UpdateStatusRequest(
-    long PaymentId,
-    int StatusId
-    );
-
 
 public sealed record CreatePaymentRequest(
     long OrderId, 
